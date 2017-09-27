@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.mixture import GaussianMixture
 from sklearn.model_selection import train_test_split
 
 class Data:
@@ -11,10 +12,9 @@ class Data:
 	self.target = None
 
         self.read_data()
+        self.preprocess()
 	self.train = self.data
 	self.target = self.train[self.target_name]
-
-        self.preprocess()
 
 #	self.train = self.data[self.data['train']]
         self.train =  self.train.drop([self.target_name, 'parcelid', 'transactiondate'], axis=1)
@@ -34,6 +34,7 @@ class Data:
 
 	properties_2016 = pd.read_csv('input/properties_2016.csv')
 	self.data = pd.merge(train_2016, properties_2016, on='parcelid', how='left')
+	self.target = self.data.logerror
 #	sample = pd.read_csv('input/sample_submission.csv')
 	# sample.rename(columns = {'ParcelId': 'parcelid'}, inplace=True)
 #	sample['parcelid'] = sample['ParcelId']
@@ -75,6 +76,16 @@ class Data:
 	# self.x_train = self.x_train[select_index]
 	# self.y_train = self.y_train[select_index]
 	self.data = self.data[(self.target < outlier_upper) & (self.target > outlier_lower)]
+	
+    def create_cluster(self):
+	gmm = GaussianMixture(n_components = 170, covariance_type = 'full')
+	gmm.fit(self.data[['latitude', 'longitude']])
+	self.data['cluster'] = gmm.predict(self.data[['latitude', 'longitude']])
+
+    def create_cnt(self, col):
+	ct = dict(self.data[col].value_counts())
+	newcol = col + 'cnt'
+	self.data[newcol] = self.data[col].apply(lambda x: ct[x])
 
     def preprocess(self):
 	'''
@@ -83,6 +94,12 @@ class Data:
 	Label encode object type data
 	'''
 	print 'Preprocessing...'
+
+	self.data['nacnt'] = self.data.isnull().sum(axis=1)
+
+	# Remove outliers
+	self.remove_outlier()
+
 	# In the data description file, airconditioningtypeid 5 corresponds to None
 	# In the data description file, airconditioningtypeid 13 corresponds to None
 	self.fillna_val(self.data, 'airconditioningtypeid', 5)
@@ -128,8 +145,10 @@ class Data:
 		if self.data[col].isnull().sum() > 0:
 			self.fillna_neighbor(self.data, col, 5)
 
-	# Remove outliers
-	self.remove_outlier()
+	self.create_cluster()
+	create_cnt = ['regionidcounty', 'regionidcity', 'regionidzip', 'regionidneighborhood']
+	for col in create_cnt:
+		self.create_cnt(col)
 
 	print self.data.info()
 
