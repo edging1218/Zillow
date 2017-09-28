@@ -82,11 +82,11 @@ class Model:
         """
         self.create_model(params)
         self.fit_model(x, y)
-	pred = self.predict_model(x_test)
+        pred = self.predict_model(x_test)
         self.calc_metrics(metrics, y_test, pred)
-	if self.model_type == 'xgb':
-	    xgboost.plot_importance(self.model)
-	    plt.show()
+        if self.model_type == 'xgb':
+            xgboost.plot_importance(self.model)
+            plt.show()
         return pred
 
     def run_all(self, metrics, params=True):
@@ -97,7 +97,7 @@ class Model:
                         self.features.y_train,
                         self.features.x_test,
                         self.features.y_test,
-			metrics,
+                        metrics,
                         params)
 
     def run_submission(self, params=True):
@@ -106,7 +106,7 @@ class Model:
         """
         self.create_model(params)
         self.fit_model(self.features.train, self.features.target)
-	return self.predict_model(self.features.test)
+        return self.predict_model(self.features.test)
 
     def cross_validation(self, x, y, k_fold, params=True):
         """
@@ -125,7 +125,7 @@ class Model:
                                               params),
                                      index=test_index).add_suffix('_' + self.model_type)
             test_pred = test_pred.append(pred_fold)
-       # self.calc_metrics(metrics, y, test_pred)
+            # self.calc_metrics(metrics, y, test_pred)
         return test_pred
 
     def cross_validation_all(self, k_fold, params=True):
@@ -195,8 +195,8 @@ class Model:
         elif metrics == 'logloss':
             y_true_dummies = pd.get_dummies(y_true)
             print 'logloss: %f' % (log_loss(y_true_dummies, y_pred))
-	elif metrics == 'mae':
-	    print 'mean absolute error: %f' % (mean_absolute_error(y_true, y_pred))
+        elif metrics == 'mae':
+            print 'mean absolute error: %f' % (mean_absolute_error(y_true, y_pred))
 
     @property
     def get_model_name(self):
