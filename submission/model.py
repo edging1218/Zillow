@@ -105,8 +105,8 @@ class Model:
         Wrap-up function for model create, fit and result report
         """
         self.create_model(params)
-        self.fit_model(self.train, self.target)
-	return self.predict_model(self.data)
+        self.fit_model(self.features.train, self.features.target)
+	return self.predict_model(self.features.test)
 
     def cross_validation(self, x, y, k_fold, params=True):
         """

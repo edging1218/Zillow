@@ -20,11 +20,13 @@ if __name__ == '__main__':
 
      # Similar grid search is made for xgboost model. Best parameters are chosen as follows.
     start = time()
-    param_xgb = {'xgb_grid': {'learning_rate': [0.03, 0.04, 0.05, 0.06],
-				'n_estimators': [200, 250, 300, 350, 400, 500],
+    param_xgb = {'xgb_grid': {'learning_rate': [0.02],
+				'n_estimators': [550],
 				'objective': ['reg:linear'],
-				'max_depth': [3, 4, 5],
-				'gamma': [0, 0.1]
+				'max_depth': [5],
+				'gamma': [0],
+				'subsample': [0.9], 
+				'min_child_weight': [2]
 				}}
     xgb = Model(df, 'xgb', param_xgb)
     print xgb.grid_search_all('neg_mean_absolute_error', 4)

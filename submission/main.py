@@ -19,11 +19,11 @@ if __name__ == '__main__':
      #print 'Time used for logistic regression: {} min.'.format((end - start) / 60)
 
      # Similar grid search is made for xgboost model. Best parameters are chosen as follows.
-    param_xgb = {'xgb_grid': {'learning_rate': [0.04],
-				'n_estimators': [200],
-				'objective': ['reg:linear'],
-				'max_depth': [3]
+    param_xgb = {'xgb': {'learning_rate': 0.02,
+				'n_estimators': 550,
+				'objective': 'reg:linear',
+				'max_depth': 5
 				}}
     xgb = Model(df, 'xgb', param_xgb)
     pred = xgb.run_submission()
-    df.submit(pred)
+    df.submit(pred, 'xgboost_new_feature')
