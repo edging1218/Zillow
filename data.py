@@ -60,6 +60,9 @@ class Data:
         le.fit(list(df[col].values))
         df[col] = le.transform(list(df[col].values))
 
+    def log_transform(self, df, col):
+        df[col+'log'] = np.log(df[col])
+
     def remove_outlier(self, alpha):
         q1 = np.percentile(self.y_train, 25)
         q3 = np.percentile(self.y_train, 75)
@@ -120,14 +123,13 @@ class Data:
         fill_zero = ['bathroomcnt', 'bedroomcnt', 'buildingqualitytypeid', 'threequarterbathnbr',
                      'finishedfloor1squarefeet', 'calculatedfinishedsquarefeet', 'finishedsquarefeet12',
                      'finishedsquarefeet15', 'finishedsquarefeet50', 'fireplacecnt', 'fireplacecnt',
-                     'garagecarcnt', 'garagetotalsqft', 'pooltypeid7', 'roomcnt',
-                     'lotsizesquarefeet', 'numberofstories', 'poolcnt', 'pooltypeid10', 'pooltypeid2',
+                     'garagecarcnt', 'garagetotalsqft', 'pooltypeid7', 'roomcnt', 'numberofstories', 'poolcnt', 'pooltypeid10', 'pooltypeid2',
                      'unitcnt', 'yardbuildingsqft17', 'fullbathcnt']
         for col in fill_zero:
             self.fillna_val(self.data, col, 0)
 
         # For the col in fill_mean, fillna with col mean.
-        fill_mean = ['fips', 'latitude', 'longitude', 'yearbuilt',
+        fill_mean = ['fips', 'latitude', 'longitude', 'yearbuilt', 'lotsizesquarefeet',
                      'taxvaluedollarcnt', 'structuretaxvaluedollarcnt',
                      'landtaxvaluedollarcnt', 'taxamount', 'assessmentyear',
                      'taxdelinquencyyear'] + ['propertycountylandusecode', 'propertylandusetypeid',
@@ -152,7 +154,7 @@ class Data:
         # living area proportions
         self.data['living_area_prop'] = self.data['calculatedfinishedsquarefeet'] / self.data['lotsizesquarefeet']
         # tax value ratio
-        self.data['value_ratio'] = self.data['taxvaluedollarcnt'] / self.data['taxamount']
+        self.data['value_ratio'] = self.data['taxvaluedollarcnt'] / self.data['structuretaxvaluedollarcnt']
         # tax value proportions
         self.data['value_prop'] = self.data['structuretaxvaluedollarcnt'] / self.data['landtaxvaluedollarcnt']
 
@@ -163,11 +165,21 @@ class Data:
                 self.data[col] = self.data[col].astype(np.int32)
 
         self.data[['latitude', 'longitude']] /= 1e6
-        self.data['censustractandblock'] /= 1e12
+
+        # m = self.data['censustractandblock'].mean()
+        # print m
+        # self.data['censustractandblock'] = self.data['censustractandblock'].\
+        #   replace(-1, m, inplace=True)
+        # self.data['censustractandblock'] = self.data['censustractandblock'].astype(np.float32)
+
+
+        log_col = ['structuretaxvaluedollarcnt', 'taxamount', 'lotsizesquarefeet', 'censustractandblock']
+        for col in log_col:
+            self.log_transform(self.data, col)
 
         # self.create_polar_coor()
 
-        # print self.data.info()
+        print self.data.head()
 
     def dummies(self, col, name):
         series = self.data[col]
