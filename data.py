@@ -3,6 +3,7 @@ import numpy as np
 from sklearn.preprocessing import LabelEncoder
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.mixture import GaussianMixture
+from sklearn.cluster import KMeans
 from sklearn.model_selection import train_test_split
 
 
@@ -81,10 +82,21 @@ class Data:
         gmm.fit(self.data[['latitude', 'longitude']])
         self.data['cluster'] = gmm.predict(self.data[['latitude', 'longitude']])
 
+
+    def create_cluster_kmeans(self, n_cluster):
+        cluster = KMeans(n_clusters=n_cluster, random_state=10)
+        cluster.fit(self.data[['latitude', 'longitude']])
+        self.data['cluster'] = cluster.predict(self.data[['latitude', 'longitude']])
+
     def create_cnt(self, col):
         ct = dict(self.data[col].value_counts())
         newcol = col + 'cnt'
         self.data[newcol] = self.data[col].apply(lambda x: ct[x])
+
+    def create_mean(self, col_to_agg, col_to_group):
+        means = self.data[[col_to_agg, col_to_group]].groupby(col_to_group).agg('mean')
+        ct = dict(means.reset_index().as_matrix())
+        self.data[col_to_agg + '_' + col_to_group] = self.data[col_to_group].apply(lambda x: ct[x])
 
     def create_polar_coor(self):
         center = [self.data['latitude'].mean(), self.data['longitude'].mean()]
@@ -134,29 +146,43 @@ class Data:
                      'landtaxvaluedollarcnt', 'taxamount', 'assessmentyear',
                      'taxdelinquencyyear'] + ['propertycountylandusecode', 'propertylandusetypeid',
                          'propertyzoningdesc', 'rawcensustractandblock',
-                         'censustractandblock']
+                         'censustractandblock'] + ['regionidcounty', 'regionidcity',
+                         'regionidzip']
         for col in fill_mean:
             self.fillna_mean(self.data, col)
 
         # For location related cols, fillna with the vote of 5 nearest neighbors.
-        fill_neighbor =  ['regionidcounty', 'regionidcity',
-                         'regionidzip', 'regionidneighborhood']
+        fill_neighbor = ['regionidneighborhood']
         for col in fill_neighbor:
             if self.data[col].isnull().sum() > 0:
                 # self.fillna_neighbor(self.data, col, 10)
                 self.fillna_mean(self.data, col)
 
-        self.create_cluster(n_cluster)
+
         create_cnt = ['regionidcounty', 'regionidcity', 'regionidzip', 'regionidneighborhood']
         for col in create_cnt:
             self.create_cnt(col)
 
+        self.data[['latitude', 'longitude']] /= 1e6
+        self.create_cluster_kmeans(n_cluster)
+
+        col_agg = ['structuretaxvaluedollarcnt', 'taxamount', 'lotsizesquarefeet', 'calculatedfinishedsquarefeet',
+                   'finishedsquarefeet12', 'yearbuilt']
+        col_group = ['regionidzip', 'regionidcity', 'regionidneighborhood', 'cluster']
+
+        for col1 in col_agg:
+            for col2 in col_group:
+                self.create_mean(col1, col2)
+
         # living area proportions
         self.data['living_area_prop'] = self.data['calculatedfinishedsquarefeet'] / self.data['lotsizesquarefeet']
-        # tax value ratio
+        # tax value ratioZ
         self.data['value_ratio'] = self.data['taxvaluedollarcnt'] / self.data['structuretaxvaluedollarcnt']
         # tax value proportions
         self.data['value_prop'] = self.data['structuretaxvaluedollarcnt'] / self.data['landtaxvaluedollarcnt']
+        # tax room ratio
+        self.data['room_prop'] = self.data['bathroomcnt'] / self.data['bedroomcnt']
+        self.fillna_val(self.data, 'room_prop', 0)
 
         for col, dtype in zip(self.data.columns, self.data.dtypes):
             if dtype == np.float64:
@@ -164,14 +190,11 @@ class Data:
             if dtype == np.int64:
                 self.data[col] = self.data[col].astype(np.int32)
 
-        self.data[['latitude', 'longitude']] /= 1e6
-
         # m = self.data['censustractandblock'].mean()
         # print m
         # self.data['censustractandblock'] = self.data['censustractandblock'].\
         #   replace(-1, m, inplace=True)
         # self.data['censustractandblock'] = self.data['censustractandblock'].astype(np.float32)
-
 
         log_col = ['structuretaxvaluedollarcnt', 'taxamount', 'lotsizesquarefeet', 'censustractandblock']
         for col in log_col:
@@ -194,7 +217,7 @@ class Data:
                                                                                 random_state=1)
         # Remove outliers
         self.remove_outlier(outlier_alpha)
-        print 'x_Training set has {} rows, {} columns.\n'.format(*self.x_train.shape)
+        print '\nx_Training set has {} rows, {} columns.'.format(*self.x_train.shape)
         print 'x_Test set has {} rows, {} columns.\n'.format(*self.x_test.shape)
 
     def data_info(self):

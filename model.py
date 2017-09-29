@@ -1,5 +1,5 @@
 import xgboost
-from sklearn.ensemble import AdaBoostClassifier, RandomForestClassifier
+from sklearn.ensemble import AdaBoostRegressor, RandomForestRegressor
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.linear_model import SGDClassifier
@@ -36,7 +36,7 @@ class Model:
             if self.model_type == 'xgb':
                 self.model = xgboost.XGBRegressor(**self.param)
             elif self.model_type == 'adaboost':
-                self.model = AdaBoostClassifier(**self.param)
+                self.model = AdaBoostRegressor(**self.param)
             elif self.model_type == 'knn32':
                 self.model = KNeighborsClassifier(**self.param)
             elif self.model_type == 'knn64':
@@ -56,9 +56,9 @@ class Model:
             if self.model_type == 'xgb':
                 self.model = xgboost.XGBRegressor()
             elif self.model_type == 'adaboost':
-                self.model = AdaBoostClassifier()
+                self.model = AdaBoostRegressor()
             elif self.model_type == 'rf':
-                self.model = RandomForestClassifier()
+                self.model = RandomForestRegressor()
             elif self.model_type == 'logit':
                 self.model = LogisticRegression()
             elif self.model_type == 'svm':
