@@ -17,6 +17,8 @@ class Data:
         self.preprocess(n_cluster)
         self.train = self.data
         self.target = self.train[self.target_name]
+        self.train_num = 0
+        self.test_num = 0
 
         # self.train = self.data[self.data['train']]
         self.train = self.train.drop([self.target_name, 'parcelid', 'transactiondate'], axis=1)
@@ -217,6 +219,8 @@ class Data:
                                                                                 random_state=1)
         # Remove outliers
         self.remove_outlier(outlier_alpha)
+        self.train_num = self.x_train.shape[0]
+        self.test_num = self.x_test.shape[0]
         print '\nx_Training set has {} rows, {} columns.'.format(*self.x_train.shape)
         print 'x_Test set has {} rows, {} columns.\n'.format(*self.x_test.shape)
 

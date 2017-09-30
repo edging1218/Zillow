@@ -1,9 +1,10 @@
 import xgboost
-from sklearn.ensemble import AdaBoostRegressor, RandomForestRegressor
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.linear_model import SGDClassifier
-from sklearn.svm import SVC
+from sklearn.ensemble import AdaBoostRegressor, RandomForestRegressor, ExtraTreesRegressor
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.linear_model import ElasticNet, Lasso, Ridge
+from sklearn.linear_model import SGDRegressor
+from sklearn.neural_network import MLPRegressor
+from sklearn.svm import SVR
 from sklearn.model_selection import GridSearchCV, KFold, train_test_split
 from sklearn.metrics import fbeta_score, accuracy_score, log_loss, mean_absolute_error
 import pandas as pd
@@ -37,20 +38,24 @@ class Model:
                 self.model = xgboost.XGBRegressor(**self.param)
             elif self.model_type == 'adaboost':
                 self.model = AdaBoostRegressor(**self.param)
-            elif self.model_type == 'knn32':
-                self.model = KNeighborsClassifier(**self.param)
-            elif self.model_type == 'knn64':
-                self.model = KNeighborsClassifier(**self.param)
-            elif self.model_type == 'knn128':
-                self.model = KNeighborsClassifier(**self.param)
             elif self.model_type == 'rf':
-                self.model = RandomForestClassifier(**self.param)
-            elif self.model_type == 'logit':
-                self.model = LogisticRegression(**self.param)
+                self.model = RandomForestRegressor(**self.param)
+            elif self.model_type == 'knn':
+                self.model = KNeighborsRegressor(**self.param)
             elif self.model_type == 'svm':
-                self.model = SVC(**self.param)
+                self.model = SVR(**self.param)
             elif self.model_type == 'sgd':
-                self.model = SGDClassifier(**self.param)
+                self.model = SGDRegressor(**self.param)
+            elif self.model_type == 'elas':
+                self.model = ElasticNet(**self.param)
+            elif self.model_type == 'mlp':
+                self.model = MLPRegressor(**self.param)
+            elif self.model_type == 'extra':
+                self.model = ExtraTreesRegressor(**self.param)
+            elif self.model_type == 'lasso':
+                self.model = Lasso(**self.param)
+            elif self.model_type == 'ridge':
+                self.model = Ridge(**self.param)
         else:
             # used for grid_search
             if self.model_type == 'xgb':
@@ -97,10 +102,10 @@ class Model:
                         self.features.y_train,
                         self.features.x_test,
                         self.features.y_test,
-            metrics,
+                        metrics,
                         params)
 
-    def cross_validation(self, x, y, k_fold, params=True):
+    def cross_validation(self, x, y, metrics, k_fold, params=True):
         """
         k-fold cross-validation
         """
@@ -117,15 +122,16 @@ class Model:
                                               params),
                                      index=test_index).add_suffix('_' + self.model_type)
             test_pred = test_pred.append(pred_fold)
-        # self.calc_metrics(metrics, y, test_pred)
+        self.calc_metrics(metrics, y, test_pred)
         return test_pred
 
-    def cross_validation_all(self, k_fold, params=True):
+    def cross_validation_all(self, metrics, k_fold, params=True):
         """
         k-fold cross-validation with original data-set
         """
         return self.cross_validation(self.features.x_train,
                                      self.features.y_train,
+                                     metrics,
                                      k_fold,
                                      params)
 
@@ -170,12 +176,8 @@ class Model:
         Stack meta-features for model stacking
         """
         print 'Start feature stacking for {}'.format(self.model_type)
-        meta_feature_train = self.cross_validation_all(
-            k_fold,
-            metrics,
-            True,
-            True)
-        meta_feature_test = self.run_all(True)
+        meta_feature_train = self.cross_validation_all(metrics, k_fold)
+        meta_feature_test = self.run_all(metrics)
         return meta_feature_train, meta_feature_test
 
     def calc_metrics(self, metrics, y_true, y_pred):
