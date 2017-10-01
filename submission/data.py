@@ -28,8 +28,10 @@ class Data:
 
         sample = pd.read_csv('../input/sample_submission.csv')
         sample['parcelid'] = sample['ParcelId']
+
         self.test = sample.merge(properties_2016, on='parcelid', how='left')
         self.test = self.test.drop(sample.columns.tolist(), axis=1)
+
         del sample['parcelid']
 
         self.submission = sample
