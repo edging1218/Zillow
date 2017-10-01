@@ -3,6 +3,7 @@ import numpy as np
 from sklearn.preprocessing import LabelEncoder
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.mixture import GaussianMixture
+from sklearn.cluster import KMeans
 from sklearn.model_selection import train_test_split
 
 
@@ -96,6 +97,12 @@ class Data:
         gmm.fit(self.train[['latitude', 'longitude']])
         for df in [self.train, self.test]:
             df.loc[:, 'cluster'] = gmm.predict(df[['latitude', 'longitude']])
+
+    def create_cluster_kmeans(self, n_cluster):
+        cluster = KMeans(n_clusters=50, random_state=10)
+        cluster.fit(self.train[['latitude', 'longitude']])
+        for df in [self.train, self.test]:
+            df.loc[:, 'cluster'] = cluster.predict(df[['latitude', 'longitude']])
 
     def create_cnt(self, col):
         ct_train = dict(self.train[col].value_counts())
@@ -216,7 +223,7 @@ class Data:
         self.remove_outlier()
 
         # Cluster the positioning data
-        self.create_cluster()
+        self.create_cluster_kmeans()
 
 
         col_agg = ['structuretaxvaluedollarcnt', 'taxamount', 'lotsizesquarefeet', 'calculatedfinishedsquarefeet',

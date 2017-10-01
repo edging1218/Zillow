@@ -9,38 +9,29 @@ if __name__ == '__main__':
     # create a model class with grid search parameters by accuracy
     # Optimal parameters are assigned
     # run_all function fits the model then evaluates the performance in test data
-    # start = time()
-    # param_logit_grid = {'logit_grid':
-    #                        {'penalty': ['l1', 'l2'],
-    #                         'C': [10 ** i for i in range(-3, 1, 1)]}}
-    # logit = Model(crimes, 'logit', param_logit_grid)
-    # logit.grid_search_all('accuracy', 3)
-    # logit.run_all('accuracy', 3)
-    # end = time()
-    # print 'Time used for logistic regression: {} min.'.format((end - start) / 60)
-
     # Similar grid search is made for xgboost model. Best parameters are chosen as follows.
-    # param_xgb = {'xgb': {'learning_rate': 0.02,
-    #                      'n_estimators': 550,
-    #                      'objective': 'reg:linear',
-    #                      'max_depth': 5,
-    #                      'subsample': 0.75,
-    #                      'min_child_weight': 2
-    #                      }}
+    param_xgb = {'xgb': {'learning_rate': 0.02,
+                          'n_estimators': 550,
+                          'objective': 'reg:linear',
+                          'max_depth': 5,
+                          'subsample': 0.7,
+                          'min_child_weight': 3
+                          }}
     #
-    lasso = Model(df, 'lasso', {'lasso': {'alpha':  18}})
-    ridge = Model(df, 'ridge', {'ridge': {'alpha': 0.5}})
-    lasso_stack = Model(df, 'ridge', {'ridge': {}})
-    stack = Stacker(df, 3, [lasso, ridge], [lasso_stack])
-    stack.predict(0)
+    # lasso = Model(df, 'lasso', {'lasso': {'alpha':  18}})
+    # ridge = Model(df, 'ridge', {'ridge': {'alpha': 0.5}})
+    # lasso_stack = Model(df, 'ridge', {'ridge': {}})
+    # stack = Stacker(df, 3, [lasso, ridge], [lasso_stack])
+    # stack.predict(0)
 
-    # start = time()
-    # for month in [10, 11, 12]:
-    #     df.assign_test_month(month)
-    #     model = Model(df, 'lasso', {'lasso': {'alpha': 20}})
-    #     pred = model.run_submission()
-    #     df.write_submission(pred, month)
-    #
-    # df.submit('lasso')
+    start = time()
+    for month in [10, 11, 12]:
+        df.assign_test_month(month)
+        #model = Model(df, 'lasso', {'lasso': {'alpha': 20}})
+        model = Model(df, 'xgb', param_xgb)
+        pred = model.run_submission()
+        df.write_submission(pred, month)
+    
+    df.submit('xgboost_kmeans')
     end = time()
     print('Time used: {} min.'.format((end - start) / 60))

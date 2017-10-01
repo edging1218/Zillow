@@ -1,4 +1,4 @@
-# import xgboost
+import xgboost
 from sklearn.ensemble import AdaBoostRegressor, RandomForestRegressor, ExtraTreesRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.linear_model import ElasticNet, Lasso, Ridge
