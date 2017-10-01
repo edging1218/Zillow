@@ -1,4 +1,4 @@
-import xgboost
+# import xgboost
 from sklearn.ensemble import AdaBoostRegressor, RandomForestRegressor, ExtraTreesRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.linear_model import ElasticNet, Lasso, Ridge
@@ -64,10 +64,24 @@ class Model:
                 self.model = AdaBoostRegressor()
             elif self.model_type == 'rf':
                 self.model = RandomForestRegressor()
-            elif self.model_type == 'logit':
-                self.model = LogisticRegression()
             elif self.model_type == 'svm':
-                self.model = SVC()
+                self.model = SVR()
+            elif self.model_type == 'lasso':
+                self.model = Lasso()
+            elif self.model_type == 'knn':
+                self.model = KNeighborsRegressor()
+            elif self.model_type == 'sgd':
+                self.model = SGDRegressor()
+            elif self.model_type == 'elas':
+                self.model = ElasticNet()
+            elif self.model_type == 'mlp':
+                self.model = MLPRegressor()
+            elif self.model_type == 'extra':
+                self.model = ExtraTreesRegressor()
+            elif self.model_type == 'lasso':
+                self.model = Lasso()
+            elif self.model_type == 'ridge':
+                self.model = Ridge()
 
     def fit_model(self, x, y):
         """
@@ -109,19 +123,22 @@ class Model:
         """
         k-fold cross-validation
         """
-        x = np.array(x)
+        print('Start cross validation...')
+        # x = x.as_matrix()
         test_pred = pd.DataFrame()
         kf = KFold(n_splits=k_fold, random_state=10)
         for train_index, test_index in kf.split(x):
-            x_train, x_test = x[train_index, :], x[test_index, :]
+            x_train, x_test = x.ix[train_index, :], x.ix[test_index, :]
             y_train, y_test = y[train_index], y[test_index]
             pred_fold = pd.DataFrame(self.run(x_train,
                                               y_train,
                                               x_test,
                                               y_test,
+                                              metrics,
                                               params),
                                      index=test_index).add_suffix('_' + self.model_type)
             test_pred = test_pred.append(pred_fold)
+        test_pred.sort_index(inplace=True)
         self.calc_metrics(metrics, y, test_pred)
         return test_pred
 
@@ -139,7 +156,7 @@ class Model:
         """
         Grid search for hyper-parameters
         """
-        print 'Start grid search for {}...'.format(self.model_type)
+        print('Start grid search for {}...'.format(self.model_type))
         start = time()
         grid_name = self.model_type + '_grid'
         if grid_name not in params:
@@ -153,11 +170,12 @@ class Model:
                                 scoring=metrics,
                                 cv=kf.split(x))
         grid_fit = grid_obj.fit(x, y)
-        print 'Best parameters chosen is: {}'.format(grid_fit.best_params_)
-        print 'Best score is: {}'.format(grid_fit.best_score_)
+        print('Best parameters chosen is: {}'.format(grid_fit.best_params_))
+        print('Best score is: {}'.format(grid_fit.best_score_))
         end = time()
-        print 'Time used for searching is {} min.'.format((end - start) / 60)
+        print('Time used for searching is {} min.'.format((end - start) / 60))
         res = pd.DataFrame(grid_obj.cv_results_)
+        print(res)
         self.param = grid_fit.best_params_
         return res
 
@@ -171,11 +189,11 @@ class Model:
                                 k_fold,
                                 self.model_param)
 
-    def stacking_feature(self, k_fold, metrics):
+    def stacking_feature(self, metrics, k_fold):
         """
         Stack meta-features for model stacking
         """
-        print 'Start feature stacking for {}'.format(self.model_type)
+        print('Start feature stacking for {}'.format(self.model_type))
         meta_feature_train = self.cross_validation_all(metrics, k_fold)
         meta_feature_test = self.run_all(metrics)
         return meta_feature_train, meta_feature_test
@@ -185,12 +203,12 @@ class Model:
         Model evaluation
         """
         if metrics == 'accuracy':
-            print 'accuracy: %f' % (accuracy_score(y_true, y_pred))
+            print('accuracy: %f' % (accuracy_score(y_true, y_pred)))
         elif metrics == 'logloss':
             y_true_dummies = pd.get_dummies(y_true)
-            print 'logloss: %f' % (log_loss(y_true_dummies, y_pred))
+            print('logloss: %f' % (log_loss(y_true_dummies, y_pred)))
         elif metrics == 'mae':
-            print "mean absolute error: %f" % (mean_absolute_error(y_true, y_pred))
+            print("mean absolute error: %f" % (mean_absolute_error(y_true, y_pred)))
 
     @property
     def get_model_name(self):

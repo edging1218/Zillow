@@ -12,16 +12,17 @@ class Data:
         self.target_name = 'logerror'
         self.data = None
         self.target = None
+        self.train_num = 0
+        self.test_num = 0
+
 
         self.read_data()
         self.preprocess(n_cluster)
         self.train = self.data
-        self.target = self.train[self.target_name]
-        self.train_num = 0
-        self.test_num = 0
+
 
         # self.train = self.data[self.data['train']]
-        self.train = self.train.drop([self.target_name, 'parcelid', 'transactiondate'], axis=1)
+        # self.train = self.train.drop([self.target_name, 'parcelid', 'transactiondate'], axis=1)
         # self.train =  self.train.drop([self.target_name, 'parcelid', 'transactiondate', 'train'], axis=1)
         self.split_data(outlier_alpha)
 
@@ -32,7 +33,7 @@ class Data:
         """
         Read in train and test data
         """
-        print 'Read in data...'
+        # print 'Read in data...'
         train_2016 = pd.read_csv('input/train_2016_v2.csv', parse_dates=['transactiondate'])
         properties_2016 = pd.read_csv('input/properties_2016.csv')
         self.data = pd.merge(train_2016, properties_2016, on='parcelid', how='left')
@@ -64,7 +65,15 @@ class Data:
         df[col] = le.transform(list(df[col].values))
 
     def log_transform(self, df, col):
-        df[col+'log'] = np.log(df[col])
+        df[col].replace(0, 1e-1, inplace=True)
+        df[col].replace(-1, 1e-2, inplace=True)
+        df[col + '_log'] = np.log(df[col])
+        self.fillna_val(df, col, 0)
+
+    def create_prop(self, df, col1, col2):
+        df[col1+'_d_'+col2] = df[col1] / df[col2]
+        self.fillna_val(df, col1+'_d_'+col2, 0)
+        df[col1+'_d_'+col2].replace([np.inf, -np.inf], 0, inplace=True)
 
     def remove_outlier(self, alpha):
         q1 = np.percentile(self.y_train, 25)
@@ -72,8 +81,8 @@ class Data:
         iqr = q3 - q1
         outlier_upper = q3 + alpha * iqr
         outlier_lower = q1 - alpha * iqr
-        print 'Outlier upper bound is {}'.format(outlier_upper)
-        print 'Outlier lower bound is {}'.format(outlier_lower)
+        # print 'Outlier upper bound is {}'.format(outlier_upper)
+        # print 'Outlier lower bound is {}'.format(outlier_lower)
         select_index = (self.y_train < outlier_upper)&(self.y_train > outlier_lower)
         self.x_train = self.x_train[select_index]
         self.y_train = self.y_train[select_index]
@@ -116,7 +125,7 @@ class Data:
         Label encode object type data
         """
 
-        print 'Preprocessing...'
+        # print 'Preprocessing...'
         self.data['month'] = self.data['transactiondate'].dt.month
         self.data['nacnt'] = self.data.isnull().sum(axis=1)
 
@@ -160,6 +169,23 @@ class Data:
                 # self.fillna_neighbor(self.data, col, 10)
                 self.fillna_mean(self.data, col)
 
+        log_col = ['structuretaxvaluedollarcnt', 'taxamount', 'lotsizesquarefeet', 'censustractandblock']
+        for col in log_col:
+            self.log_transform(self.data, col)
+
+        e17 = ['rawcensustractandblock']
+        for col in e17:
+            self.data[col] = self.data[col]/1e17
+        e12 = ['censustractandblock', 'structuretaxvaluedollarcnt', 'taxvaluedollarcnt', 'landtaxvaluedollarcnt']
+        for col in e12:
+            self.data[col] = self.data[col]/1e12
+        e8 = ['taxamount', 'lotsizesquarefeet']
+        for col in e8:
+            self.data[col] = self.data[col]/1e8
+        e6 = ['latitude', 'longitude', 'calculatedfinishedsquarefeet', 'finishedsquarefeet12', 'finishedsquarefeet15']
+        for col in e6:
+            self.data[col] = self.data[col]/1e6
+
 
         create_cnt = ['regionidcounty', 'regionidcity', 'regionidzip', 'regionidneighborhood']
         for col in create_cnt:
@@ -177,14 +203,13 @@ class Data:
                 self.create_mean(col1, col2)
 
         # living area proportions
-        self.data['living_area_prop'] = self.data['calculatedfinishedsquarefeet'] / self.data['lotsizesquarefeet']
-        # tax value ratioZ
-        self.data['value_ratio'] = self.data['taxvaluedollarcnt'] / self.data['structuretaxvaluedollarcnt']
+        self.create_prop(self.data, 'calculatedfinishedsquarefeet', 'lotsizesquarefeet')
+        # tax value ratio
+        self.create_prop(self.data, 'taxvaluedollarcnt', 'taxamount')
         # tax value proportions
-        self.data['value_prop'] = self.data['structuretaxvaluedollarcnt'] / self.data['landtaxvaluedollarcnt']
-        # tax room ratio
-        self.data['room_prop'] = self.data['bathroomcnt'] / self.data['bedroomcnt']
-        self.fillna_val(self.data, 'room_prop', 0)
+        self.create_prop(self.data, 'structuretaxvaluedollarcnt', 'landtaxvaluedollarcnt')
+        # room ratio
+        self.create_prop(self.data, 'bedroomcnt', 'bathroomcnt')
 
         for col, dtype in zip(self.data.columns, self.data.dtypes):
             if dtype == np.float64:
@@ -192,19 +217,18 @@ class Data:
             if dtype == np.int64:
                 self.data[col] = self.data[col].astype(np.int32)
 
-        # m = self.data['censustractandblock'].mean()
-        # print m
-        # self.data['censustractandblock'] = self.data['censustractandblock'].\
-        #   replace(-1, m, inplace=True)
-        # self.data['censustractandblock'] = self.data['censustractandblock'].astype(np.float32)
 
-        log_col = ['structuretaxvaluedollarcnt', 'taxamount', 'lotsizesquarefeet', 'censustractandblock']
-        for col in log_col:
-            self.log_transform(self.data, col)
 
         # self.create_polar_coor()
 
-        print self.data.head()
+        print(self.data.head())
+        # print(self.data.info())
+        self.target = self.data[self.target_name]
+        self.data = self.data.drop([self.target_name, 'parcelid', 'transactiondate'], axis=1)
+
+        m = self.data.as_matrix()
+        print(np.where(np.isnan(m)))
+        print(m[~np.isfinite(m)])
 
     def dummies(self, col, name):
         series = self.data[col]
@@ -219,28 +243,33 @@ class Data:
                                                                                 random_state=1)
         # Remove outliers
         self.remove_outlier(outlier_alpha)
+
+        self.x_train.reset_index(drop=True, inplace=True)
+        self.y_train.reset_index(drop=True, inplace=True)
+        self.x_test.reset_index(drop=True, inplace=True)
+        self.y_test.reset_index(drop=True, inplace=True)
         self.train_num = self.x_train.shape[0]
         self.test_num = self.x_test.shape[0]
-        print '\nx_Training set has {} rows, {} columns.'.format(*self.x_train.shape)
-        print 'x_Test set has {} rows, {} columns.\n'.format(*self.x_test.shape)
+        print('\nx_Training set has {} rows, {} columns.'.format(*self.x_train.shape))
+        print('x_Test set has {} rows, {} columns.\n'.format(*self.x_test.shape))
 
     def data_info(self):
         """
         Info of train and test data
         """
-        print '\nTrain:\n{}\n'.format('-' * 50)
-        self.x_train.info()
-        print '\nTrain target:\n{}\n'.format('-' * 50)
-        self.y_train.info()
+        # print '\nTrain:\n{}\n'.format('-' * 50)
+        # self.x_train.info()
+        # print '\nTrain target:\n{}\n'.format('-' * 50)
+        # self.y_train.info()
 
     def data_peek(self):
         """
         Peek at the train and test data
         """
-        print '\nTrain:\n{}\n'.format('-' * 50)
-        print self.x_train.head()
-        print '\nTrain target:\n{}\n'.format('-' * 50)
-        print self.y_train.head()
+        # print '\nTrain:\n{}\n'.format('-' * 50)
+        # print self.x_train.head()
+        # print '\nTrain target:\n{}\n'.format('-' * 50)
+        # print self.y_train.head()
 
     def submit(self, prediction):
         """
