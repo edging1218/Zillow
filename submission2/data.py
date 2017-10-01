@@ -15,6 +15,9 @@ class Data:
 
         self.read_data()
         self.preprocess()
+        print('After preprocess, train set shape: {}'.format(self.train.shape))
+        print('After preprocess, test set shape: {}'.format(self.test.shape))
+
         self.split_data()
 
     def read_data(self):
@@ -40,11 +43,11 @@ class Data:
 
         self.submission = sample
 
-        print(properties_2016.shape)
-        print(train_2016.shape)
-        print(sample.shape)
-        print(self.train.shape)
-        print(self.test.shape)
+        print('File properties_2016 shape: {}'.format(properties_2016.shape))
+        print('File train_2016 shape: {}'.format(train_2016.shape))
+        print('File sample shape: {}'.format(sample.shape))
+        print('Read_in train set shape: {}'.format(self.train.shape))
+        print('Read_in test set shape: {}'.format(self.test.shape))
 
     def fillna_val(self, df, col, val):
         df[col] = df[col].fillna(val)
@@ -98,7 +101,7 @@ class Data:
         for df in [self.train, self.test]:
             df.loc[:, 'cluster'] = gmm.predict(df[['latitude', 'longitude']])
 
-    def create_cluster_kmeans(self, n_cluster):
+    def create_cluster_kmeans(self):
         cluster = KMeans(n_clusters=50, random_state=10)
         cluster.fit(self.train[['latitude', 'longitude']])
         for df in [self.train, self.test]:
