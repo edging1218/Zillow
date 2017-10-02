@@ -15,8 +15,11 @@ class Data:
 
         self.read_data()
         self.preprocess()
-        print('After preprocess, train set shape: {}'.format(self.train.shape))
-        print('After preprocess, test set shape: {}'.format(self.test.shape))
+        print('After pre-processing, train set shape: {}'.format(self.train.shape))
+        print('After pre-processing, test set shape: {}'.format(self.test.shape))
+        self.train_num = self.train.shape[0]
+        self.test_num = self.test.shape[0]
+        self.total_num = self.train_num + self.test_num
 
         self.split_data()
 
@@ -35,12 +38,7 @@ class Data:
         self.test = sample.merge(properties_2016, on='parcelid', how='left')
         self.test = self.test.drop(sample.columns.tolist(), axis=1)
 
-        self.train_num = self.train.shape[0]
-        self.test_num = self.test.shape[0]
-        self.total_num = self.train_num + self.test_num
-
         del sample['parcelid']
-
         self.submission = sample
 
         print('File properties_2016 shape: {}'.format(properties_2016.shape))
@@ -49,13 +47,22 @@ class Data:
         print('Read_in train set shape: {}'.format(self.train.shape))
         print('Read_in test set shape: {}'.format(self.test.shape))
 
+        # to_drop =
+        #
+        # self.train.drop(to_drop, inplace=True, axis=1)
+        # self.test.drop(to_drop, inplace=True, axis=1)
+
+        self.train_num = self.train.shape[0]
+        self.test_num = self.test.shape[0]
+        self.total_num = self.train_num + self.test_num
+
     def fillna_val(self, df, col, val):
-        df[col] = df[col].fillna(val)
+        df[col].fillna(val, inplace=True)
 
     def fillna_mean(self, col):
         m = self.train[col].mean()
         for df in [self.train, self.test]:
-            df[col] = df[col].fillna(m)
+            df[col].fillna(m, inplace=True)
 
     def fillna_neighbor(self, col, k):
         model = KNeighborsClassifier(n_neighbors=k)
@@ -79,9 +86,15 @@ class Data:
         # df['col'].replace([np.inf, -np.inf], 0, inplace=True)
 
     def create_prop(self, df, col1, col2):
-        df[col1+'_d_'+col2] = df[col1] / df[col2]
-        self.fillna_val(df, col1+'_d_'+col2, 0)
-        df[col1+'_d_'+col2].replace([np.inf, -np.inf], 0, inplace=True)
+        df[col1 + '_d_' + col2] = df[col1] / df[col2]
+        self.fillna_val(df, col1 + '_d_' + col2, 0)
+        df[col1 + '_d_' + col2].replace([np.inf, -np.inf], 0, inplace=True)
+
+    def create_mult(self, df, col1, col2):
+        df[col1 + '_m_' + col2] = df[col1] * df[col2]
+
+    def create_add(self, df, col1, col2):
+        df[col1 + '_a_' + col2] = df[col1] + df[col2]
 
     def remove_outlier(self):
         self.target = self.train[self.target_name]
@@ -94,6 +107,8 @@ class Data:
         print('Outlier lower bound is {}'.format(outlier_lower))
         self.train = self.train[(self.target < outlier_upper) & (self.target > outlier_lower)]
         self.target = self.train[self.target_name]
+        self.train.reset_index(drop=True, inplace=True)
+        self.target.reset_index(drop=True, inplace=True)
 
     def create_cluster(self):
         gmm = GaussianMixture(n_components=125, covariance_type='full')
@@ -110,7 +125,6 @@ class Data:
     def create_cnt(self, col):
         ct_train = dict(self.train[col].value_counts())
         ct_test = dict(self.test[col].value_counts())
-        newcol = col + 'cnt'
 
         def extract_ct(x):
             ans = 0
@@ -121,7 +135,7 @@ class Data:
             return ans
 
         for df in [self.train, self.test]:
-            df.loc[:, newcol] = df[col].apply(lambda x: extract_ct(x))
+            df.loc[:, col + '_cnt'] = df[col].apply(lambda x: extract_ct(x))
 
     def create_mean(self, col_to_agg, col_to_group):
         mean_train = dict(self.train[[col_to_agg, col_to_group]].groupby(col_to_group).
@@ -139,6 +153,10 @@ class Data:
 
         for df in [self.train, self.test]:
             df.loc[:, col_to_agg + '_' + col_to_group] = df[col_to_group].apply(lambda x: weighted_mean(x))
+
+    def create_std(self, df, col):
+        mean = df[col].mean()
+        df[col + '_std'] = (df[col] - mean) / mean
 
     def preprocess(self):
         """
@@ -163,19 +181,15 @@ class Data:
                     self.encode_label(df, col)
 
             # For the col in fill_zero, fillna with zero.
-            fill_zero = ['architecturalstyletypeid', 'basementsqft', 'bathroomcnt',
-                         'bedroomcnt', 'buildingqualitytypeid', 'buildingclasstypeid',
-                         'calculatedbathnbr', 'decktypeid', 'threequarterbathnbr',
-                         'finishedfloor1squarefeet', 'calculatedfinishedsquarefeet',
-                         'finishedsquarefeet6', 'finishedsquarefeet12',
-                         'finishedsquarefeet13', 'finishedsquarefeet15',
-                         'finishedsquarefeet50', 'fireplacecnt', 'fireplacecnt',
-                         'garagecarcnt', 'garagetotalsqft',
-                         'lotsizesquarefeet', 'numberofstories', 'poolcnt',
-                         'poolsizesum', 'pooltypeid10', 'pooltypeid2',
-                         'pooltypeid7', 'roomcnt', 'storytypeid',
-                         'typeconstructiontypeid', 'unitcnt', 'yardbuildingsqft17',
-                         'yardbuildingsqft26', 'fullbathcnt']
+            fill_zero = ['bathroomcnt', 'bedroomcnt', 'buildingqualitytypeid', 'threequarterbathnbr',
+                         'finishedfloor1squarefeet', 'calculatedfinishedsquarefeet', 'finishedsquarefeet12',
+                         'finishedsquarefeet15', 'finishedsquarefeet50', 'fireplacecnt', 'fireplacecnt',
+                         'garagecarcnt', 'garagetotalsqft', 'lotsizesquarefeet', 'numberofstories', 'poolcnt',
+                         'pooltypeid10', 'pooltypeid2',
+                         'pooltypeid7', 'roomcnt', 'unitcnt', 'yardbuildingsqft17', 'fullbathcnt'] + \
+                        ['poolsizesum', 'finishedsquarefeet6', 'decktypeid', 'buildingclasstypeid',
+                         'typeconstructiontypeid', 'architecturalstyletypeid', 'yardbuildingsqft26', 'basementsqft',
+                         'storytypeid', 'calculatedbathnbr']
             for col in fill_zero:
                 self.fillna_val(df, col, 0)
 
@@ -183,10 +197,9 @@ class Data:
         fill_mean = ['fips', 'latitude', 'longitude', 'yearbuilt',
                      'taxvaluedollarcnt', 'structuretaxvaluedollarcnt',
                      'landtaxvaluedollarcnt', 'taxamount', 'assessmentyear',
-                     'taxdelinquencyyear'] + ['propertylandusetypeid',
-                                              'rawcensustractandblock', 'censustractandblock', 'regionidcounty',
-                                              'regionidcity',
-                                              'regionidzip', 'regionidneighborhood']
+                     'taxdelinquencyyear'] + \
+                    ['propertylandusetypeid', 'rawcensustractandblock', 'censustractandblock', 'regionidcounty',
+                     'regionidcity', 'regionidzip', 'regionidneighborhood']
         for col in fill_mean:
             self.fillna_mean(col)
 
@@ -197,6 +210,7 @@ class Data:
             le12 = ['censustractandblock', 'structuretaxvaluedollarcnt', 'taxvaluedollarcnt',
                     'landtaxvaluedollarcnt']
             le17 = ['rawcensustractandblock']
+
             for col in ['structuretaxvaluedollarcnt', 'taxamount', 'lotsizesquarefeet', 'censustractandblock']:
                 self.log_transform(df, col)
 
@@ -213,21 +227,32 @@ class Data:
             self.create_prop(df, 'structuretaxvaluedollarcnt', 'landtaxvaluedollarcnt')
             # room ratio
             self.create_prop(df, 'bedroomcnt', 'bathroomcnt')
+            # living area proportion2
+            self.create_prop(df, 'finishedsquarefeet12', 'finishedsquarefeet15')
+            # room per room
+            self.create_prop(df, 'calculatedfinishedsquarefeet', 'roomcnt')
+
+            self.create_mult(df, 'bedroomcnt', 'bedroomcnt')
+            self.create_mult(df, 'latitude', 'longitude')
+
+            self.create_add(df, 'latitude', 'longitude')
+            df['structuretaxvaluedollarcnt_2'] = df['structuretaxvaluedollarcnt'] ** 2
+
+            col_std = ['structuretaxvaluedollarcnt']
+            for col in col_std:
+                self.create_std(df, col)
 
             for col, dtype in zip(df.columns, df.dtypes):
                 if dtype == np.float64:
                     df[col] = df[col].astype(np.float32)
                 if dtype == np.int64:
                     df[col] = df[col].astype(np.int32)
-                    # print df['latitude'].describe()
-                    # print df['longitude'].describe()
 
         # Remove outliers
         self.remove_outlier()
 
         # Cluster the positioning data
-        self.create_cluster_kmeans()
-
+        self.create_cluster()
 
         col_agg = ['structuretaxvaluedollarcnt', 'taxamount', 'lotsizesquarefeet', 'calculatedfinishedsquarefeet',
                    'finishedsquarefeet12', 'yearbuilt']

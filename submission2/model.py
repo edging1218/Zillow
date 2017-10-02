@@ -103,9 +103,9 @@ class Model:
         self.fit_model(x, y)
         pred = self.predict_model(x_test)
         self.calc_metrics(metrics, y_test, pred)
-        if self.model_type == 'xgb':
-            xgboost.plot_importance(self.model)
-            plt.show()
+        # if self.model_type == 'xgb':
+        #     xgboost.plot_importance(self.model)
+        #     plt.show()
         return pred
 
     def run_all(self, metrics, params=True):
@@ -119,13 +119,20 @@ class Model:
                         metrics,
                         params)
 
-    def run_submission(self, params=True):
+    def predict(self, x, y, x_test, params=True):
         """
         Wrap-up function for model create, fit and result report
         """
         self.create_model(params)
-        self.fit_model(self.features.train, self.features.target)
-        return self.predict_model(self.features.test)
+        self.fit_model(x, y)
+        return self.predict_model(x_test)
+
+    def predict_all(self, params=True):
+        """
+        Wrap-up function for model create, fit and result report
+        """
+        print('Start predicting test data set...')
+        return self.predict(self.features.train, self.features.target, self.features.test, params)
 
     def cross_validation(self, x, y, metrics, k_fold, params=True):
         """
@@ -140,17 +147,20 @@ class Model:
                                               y_train,
                                               x_test,
                                               y_test,
+                                              metrics,
                                               params),
                                      index=test_index).add_suffix('_' + self.model_type)
             test_pred = test_pred.append(pred_fold)
+        print('Overall performance:')
         self.calc_metrics(metrics, y, test_pred)
-        test_pred.pred.sort_index(inplace=True)
+        test_pred.sort_index(inplace=True)
         return test_pred
 
     def cross_validation_all(self, metrics, k_fold, params=True):
         """
         k-fold cross-validation with original data-set
         """
+        print('Start cross_validation for train data set...')
         return self.cross_validation(self.features.train,
                                      self.features.target,
                                      metrics,
@@ -193,13 +203,13 @@ class Model:
                                 k_fold,
                                 self.model_param)
 
-    def stacking_feature(self, k_fold, metrics):
+    def stacking_feature(self, metrics, k_fold):
         """
         Stack meta-features for model stacking
         """
         print('Start feature stacking for {}'.format(self.model_type))
         meta_feature_train = self.cross_validation_all(metrics, k_fold)
-        meta_feature_test = self.run_submission()
+        meta_feature_test = self.predict_all()
         return meta_feature_train, meta_feature_test
 
     def calc_metrics(self, metrics, y_true, y_pred):

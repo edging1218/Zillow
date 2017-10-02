@@ -5,6 +5,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.mixture import GaussianMixture
 from sklearn.cluster import KMeans
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 
 
 class Data:
@@ -15,19 +16,11 @@ class Data:
         self.train_num = 0
         self.test_num = 0
 
-
         self.read_data()
         self.preprocess(n_cluster)
         self.train = self.data
 
-
-        # self.train = self.data[self.data['train']]
-        # self.train = self.train.drop([self.target_name, 'parcelid', 'transactiondate'], axis=1)
-        # self.train =  self.train.drop([self.target_name, 'parcelid', 'transactiondate', 'train'], axis=1)
         self.split_data(outlier_alpha)
-
-        # self.test = self.data[~self.data['train']]
-        # self.test =  self.test.drop([self.target_name, 'parcelid', 'transactiondate', 'train'], axis=1)
 
     def read_data(self):
         """
@@ -38,18 +31,19 @@ class Data:
         properties_2016 = pd.read_csv('input/properties_2016.csv')
         self.data = pd.merge(train_2016, properties_2016, on='parcelid', how='left')
         # drop the features with nan value more than 99%
-        to_drop = ['poolsizesum', 'finishedsquarefeet6', 'decktypeid', 'buildingclasstypeid', 'finishedsquarefeet13',
-                   'typeconstructiontypeid', 'architecturalstyletypeid', 'fireplaceflag', 'yardbuildingsqft26', 'basementsqft',
-                   'storytypeid', 'calculatedbathnbr']
-        self.data = self.data.drop(to_drop, axis=1)
+        # to_drop = ['poolsizesum', 'finishedsquarefeet6', 'decktypeid', 'buildingclasstypeid', 'finishedsquarefeet13',
+        #            'typeconstructiontypeid', 'architecturalstyletypeid', 'fireplaceflag', 'yardbuildingsqft26',
+        #            'basementsqft',
+        #            'storytypeid', 'calculatedbathnbr']
+        # self.data = self.data.drop(to_drop, axis=1)
         self.target = self.data.logerror
         # print self.data.info()
 
     def fillna_val(self, df, col, val):
-        df[col] = df[col].fillna(val)
+        df[col].fillna(val, inplace=True)
 
     def fillna_mean(self, df, col):
-        df[col] = df[col].fillna(df[col].mean())
+        df[col].fillna(df[col].mean(), inplace=True)
 
     def fillna_neighbor(self, df, col, k):
         model = KNeighborsClassifier(n_neighbors=k)
@@ -71,9 +65,9 @@ class Data:
         self.fillna_val(df, col, 0)
 
     def create_prop(self, df, col1, col2):
-        df[col1+'_d_'+col2] = df[col1] / df[col2]
-        self.fillna_val(df, col1+'_d_'+col2, 0)
-        df[col1+'_d_'+col2].replace([np.inf, -np.inf], 0, inplace=True)
+        df[col1 + '_d_' + col2] = df[col1] / df[col2]
+        self.fillna_val(df, col1 + '_d_' + col2, 0)
+        df[col1 + '_d_' + col2].replace([np.inf, -np.inf], 0, inplace=True)
 
     def remove_outlier(self, alpha):
         q1 = np.percentile(self.y_train, 25)
@@ -83,7 +77,7 @@ class Data:
         outlier_lower = q1 - alpha * iqr
         # print 'Outlier upper bound is {}'.format(outlier_upper)
         # print 'Outlier lower bound is {}'.format(outlier_lower)
-        select_index = (self.y_train < outlier_upper)&(self.y_train > outlier_lower)
+        select_index = (self.y_train < outlier_upper) & (self.y_train > outlier_lower)
         self.x_train = self.x_train[select_index]
         self.y_train = self.y_train[select_index]
         # self.data = self.data[(self.target < outlier_upper) & (self.target > outlier_lower)]
@@ -93,21 +87,19 @@ class Data:
         gmm.fit(self.data[['latitude', 'longitude']])
         self.data['cluster'] = gmm.predict(self.data[['latitude', 'longitude']])
 
-
     def create_cluster_kmeans(self, n_cluster):
         cluster = KMeans(n_clusters=n_cluster, random_state=10)
         cluster.fit(self.data[['latitude', 'longitude']])
         self.data['cluster'] = cluster.predict(self.data[['latitude', 'longitude']])
 
     def create_cnt(self, col):
-        ct = dict(self.data[col].value_counts())
-        newcol = col + 'cnt'
-        self.data[newcol] = self.data[col].apply(lambda x: ct[x])
+        ct = self.data[col].value_counts().to_dict()
+        self.data[col + '_cnt'] = self.data[col].map(ct)
 
     def create_mean(self, col_to_agg, col_to_group):
         means = self.data[[col_to_agg, col_to_group]].groupby(col_to_group).agg('mean')
-        ct = dict(means.reset_index().as_matrix())
-        self.data[col_to_agg + '_' + col_to_group] = self.data[col_to_group].apply(lambda x: ct[x])
+        means = dict(means.reset_index().as_matrix())
+        self.data[col_to_agg + '_' + col_to_group] = self.data[col_to_group].map(means)
 
     def create_polar_coor(self):
         center = [self.data['latitude'].mean(), self.data['longitude'].mean()]
@@ -117,6 +109,18 @@ class Data:
         self.data['radius'] = pos['x'] ** 2 + pos['y'] ** 2
         self.data['polar_angle'] = np.arctan2(pos['x'], pos['y'])
 
+    def create_std(self, col):
+        mean = self.data[col].mean()
+        self.data[col + '_std'] = (self.data[col] - mean) / mean
+
+    def create_multi(self, col1, col2):
+        self.data[col1 + '_mul_' + col2] = self.data[col1] * self.data[col2]
+
+    def create_add(self, col1, col2):
+        self.data[col1 + '_add_' + col2] = self.data[col1] + self.data[col2]
+
+    def create_minus(self, col1, col2):
+        self.data[col1 + '_m_' + col2] = self.data[col1] + self.data[col2]
 
     def preprocess(self, n_cluster):
         """
@@ -128,8 +132,6 @@ class Data:
         # print 'Preprocessing...'
         self.data['month'] = self.data['transactiondate'].dt.month
         self.data['nacnt'] = self.data.isnull().sum(axis=1)
-
-
 
         # In the data description file, airconditioningtypeid 5 corresponds to None
         # In the data description file, airconditioningtypeid 13 corresponds to None
@@ -146,8 +148,11 @@ class Data:
         fill_zero = ['bathroomcnt', 'bedroomcnt', 'buildingqualitytypeid', 'threequarterbathnbr',
                      'finishedfloor1squarefeet', 'calculatedfinishedsquarefeet', 'finishedsquarefeet12',
                      'finishedsquarefeet15', 'finishedsquarefeet50', 'fireplacecnt', 'fireplacecnt',
-                     'garagecarcnt', 'garagetotalsqft', 'pooltypeid7', 'roomcnt', 'numberofstories', 'poolcnt', 'pooltypeid10', 'pooltypeid2',
-                     'unitcnt', 'yardbuildingsqft17', 'fullbathcnt']
+                     'garagecarcnt', 'garagetotalsqft', 'pooltypeid7', 'roomcnt', 'numberofstories', 'poolcnt',
+                     'pooltypeid10', 'pooltypeid2', 'unitcnt', 'yardbuildingsqft17', 'fullbathcnt'] + \
+                    ['poolsizesum', 'finishedsquarefeet6', 'decktypeid', 'buildingclasstypeid', 'finishedsquarefeet13',
+                     'typeconstructiontypeid', 'architecturalstyletypeid', 'yardbuildingsqft26',
+                     'basementsqft', 'storytypeid', 'calculatedbathnbr']
         for col in fill_zero:
             self.fillna_val(self.data, col, 0)
 
@@ -156,9 +161,9 @@ class Data:
                      'taxvaluedollarcnt', 'structuretaxvaluedollarcnt',
                      'landtaxvaluedollarcnt', 'taxamount', 'assessmentyear',
                      'taxdelinquencyyear'] + ['propertycountylandusecode', 'propertylandusetypeid',
-                         'propertyzoningdesc', 'rawcensustractandblock',
-                         'censustractandblock'] + ['regionidcounty', 'regionidcity',
-                         'regionidzip']
+                                              'propertyzoningdesc', 'rawcensustractandblock',
+                                              'censustractandblock'] + ['regionidcounty', 'regionidcity',
+                                                                        'regionidzip']
         for col in fill_mean:
             self.fillna_mean(self.data, col)
 
@@ -170,29 +175,28 @@ class Data:
                 self.fillna_mean(self.data, col)
 
         log_col = ['structuretaxvaluedollarcnt', 'taxamount', 'lotsizesquarefeet', 'censustractandblock']
+        # log_col = ['censustractandblock']
         for col in log_col:
             self.log_transform(self.data, col)
 
         e17 = ['rawcensustractandblock']
         for col in e17:
-            self.data[col] = self.data[col]/1e17
+            self.data[col] = self.data[col] / 1e17
         e12 = ['censustractandblock', 'structuretaxvaluedollarcnt', 'taxvaluedollarcnt', 'landtaxvaluedollarcnt']
         for col in e12:
-            self.data[col] = self.data[col]/1e12
+            self.data[col] = self.data[col] / 1e12
         e8 = ['taxamount', 'lotsizesquarefeet']
         for col in e8:
-            self.data[col] = self.data[col]/1e8
+            self.data[col] = self.data[col] / 1e8
         e6 = ['latitude', 'longitude', 'calculatedfinishedsquarefeet', 'finishedsquarefeet12', 'finishedsquarefeet15']
         for col in e6:
-            self.data[col] = self.data[col]/1e6
-
+            self.data[col] = self.data[col] / 1e6
 
         create_cnt = ['regionidcounty', 'regionidcity', 'regionidzip', 'regionidneighborhood']
         for col in create_cnt:
             self.create_cnt(col)
 
-        self.data[['latitude', 'longitude']] /= 1e6
-        self.create_cluster_kmeans(n_cluster)
+        self.create_cluster(n_cluster)
 
         col_agg = ['structuretaxvaluedollarcnt', 'taxamount', 'lotsizesquarefeet', 'calculatedfinishedsquarefeet',
                    'finishedsquarefeet12', 'yearbuilt']
@@ -202,6 +206,10 @@ class Data:
             for col2 in col_group:
                 self.create_mean(col1, col2)
 
+        col_std = ['structuretaxvaluedollarcnt']
+        for col in col_std:
+            self.create_std(col)
+
         # living area proportions
         self.create_prop(self.data, 'calculatedfinishedsquarefeet', 'lotsizesquarefeet')
         # tax value ratio
@@ -210,6 +218,29 @@ class Data:
         self.create_prop(self.data, 'structuretaxvaluedollarcnt', 'landtaxvaluedollarcnt')
         # room ratio
         self.create_prop(self.data, 'bedroomcnt', 'bathroomcnt')
+        # living area proportion2
+        self.create_prop(self.data, 'finishedsquarefeet12', 'finishedsquarefeet15')
+        # room per room
+        self.create_prop(self.data, 'calculatedfinishedsquarefeet', 'roomcnt')
+
+        # self.create_multi('taxvaluedollarcnt', 'taxamount')
+        self.create_multi('bedroomcnt', 'bedroomcnt')
+        self.create_multi('latitude', 'longitude')
+
+        self.create_add('latitude', 'longitude')
+        self.create_minus('latitude', 'longitude')
+
+        self.data['structuretaxvaluedollarcnt_2'] = self.data['structuretaxvaluedollarcnt'] ** 2
+
+        # self.create_polar_coor()
+
+
+        # print(self.data.info())
+        self.target = self.data[self.target_name]
+        self.data = self.data.drop([self.target_name, 'parcelid', 'transactiondate'], axis=1)
+
+        # scaler = StandardScaler()
+        # self.data = pd.DataFrame(scaler.fit_transform(self.data))
 
         for col, dtype in zip(self.data.columns, self.data.dtypes):
             if dtype == np.float64:
@@ -217,18 +248,11 @@ class Data:
             if dtype == np.int64:
                 self.data[col] = self.data[col].astype(np.int32)
 
-
-
-        # self.create_polar_coor()
-
         print(self.data.head())
-        # print(self.data.info())
-        self.target = self.data[self.target_name]
-        self.data = self.data.drop([self.target_name, 'parcelid', 'transactiondate'], axis=1)
 
-        m = self.data.as_matrix()
-        print(np.where(np.isnan(m)))
-        print(m[~np.isfinite(m)])
+        # m = self.data.as_matrix()
+        # print(np.where(np.isnan(m)))
+        # print(m[~np.isfinite(m)])
 
     def dummies(self, col, name):
         series = self.data[col]
