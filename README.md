@@ -1,5 +1,6 @@
 # Kaggle Competition
 ## [Zillow Prize: Zillow’s Home Value Prediction (Zestimate)](https://www.kaggle.com/c/zillow-prize-1)
+### Ranked 52nd/3856 teams
 
 The goal of this project is to develop an algorithm that makes predictions about the future sale prices of homes. Submissions are evaluated on Mean Absolute Error between the predicted log error and the actual log error. The log error is defined as
 logerror=log(Zestimate)−log(SalePrice)
